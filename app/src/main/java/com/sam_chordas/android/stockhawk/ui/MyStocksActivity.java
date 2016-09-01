@@ -19,6 +19,7 @@ import android.view.Gravity;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.afollestad.materialdialogs.MaterialDialog;
@@ -52,26 +53,22 @@ public class MyStocksActivity extends AppCompatActivity implements LoaderManager
     private QuoteCursorAdapter mCursorAdapter;
     private Context mContext;
     private Cursor mCursor;
-    boolean mIsConnected;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         mContext = this;
-        ConnectivityManager cm =
-                (ConnectivityManager) mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
 
-        NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
-        mIsConnected = activeNetwork != null &&
-                activeNetwork.isConnectedOrConnecting();
         setContentView(R.layout.activity_my_stocks);
+
         // The intent service is for executing immediate pulls from the Yahoo API
         // GCMTaskService can only schedule tasks, they cannot execute immediately
         mServiceIntent = new Intent(this, StockIntentService.class);
         if (savedInstanceState == null) {
             // Run the initialize task service so that some stocks appear upon an empty database
             mServiceIntent.putExtra("tag", "init");
-            if (mIsConnected) {
+            if (isConnected()) {
                 startService(mServiceIntent);
             } else {
                 networkToast();
@@ -86,11 +83,15 @@ public class MyStocksActivity extends AppCompatActivity implements LoaderManager
                 new RecyclerViewItemClickListener.OnItemClickListener() {
                     @Override
                     public void onItemClick(View v, int position) {
-                        mCursorAdapter.getCursor().moveToFirst();
-                        mCursorAdapter.getCursor().move(position);
-                        Intent intent = new Intent(MyStocksActivity.this, GraphActivity.class);
-                        intent.putExtra("Key", mCursor.getString(mCursor.getColumnIndex("symbol")));
-                        startActivity(intent);
+                        if(isConnected()) {
+                            mCursorAdapter.getCursor().moveToFirst();
+                            mCursorAdapter.getCursor().move(position);
+                            Intent intent = new Intent(MyStocksActivity.this, GraphActivity.class);
+                            intent.putExtra("Key", mCursor.getString(mCursor.getColumnIndex("symbol")));
+                            startActivity(intent);
+                        }else {
+                            outOfDateToast();
+                        }
 
                     }
                 }));
@@ -101,7 +102,7 @@ public class MyStocksActivity extends AppCompatActivity implements LoaderManager
 
         fab.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
-                if (mIsConnected){
+                if (isConnected()){
                     new MaterialDialog.Builder(mContext).title(R.string.symbol_search)
                             .content(R.string.content_test)
                             .inputType(InputType.TYPE_CLASS_TEXT)
@@ -138,7 +139,7 @@ public class MyStocksActivity extends AppCompatActivity implements LoaderManager
         mItemTouchHelper.attachToRecyclerView(recyclerView);
 
         mTitle = getTitle();
-        if (mIsConnected) {
+        if (isConnected()) {
             long period = 3600L;
             long flex = 10L;
             String periodicTag = "periodic";
@@ -169,6 +170,16 @@ public class MyStocksActivity extends AppCompatActivity implements LoaderManager
 
     public void networkToast() {
         Toast.makeText(mContext, getString(R.string.network_toast), Toast.LENGTH_SHORT).show();
+    }
+    public void outOfDateToast() {
+        Toast.makeText(mContext, getString(R.string.app_offline), Toast.LENGTH_SHORT).show();
+    }
+
+    private boolean isConnected() {
+        ConnectivityManager cm = (ConnectivityManager) mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
+        return (activeNetwork != null &&
+                activeNetwork.isConnectedOrConnecting());
     }
 
     public void restoreActionBar() {
@@ -227,8 +238,6 @@ public class MyStocksActivity extends AppCompatActivity implements LoaderManager
     public void onLoaderReset(Loader<Cursor> loader) {
         mCursorAdapter.swapCursor(null);
     }
-
-
 
 
 }

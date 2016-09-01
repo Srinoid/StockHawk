@@ -8,10 +8,13 @@ import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.database.ContentObserver;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.widget.RemoteViews;
+import android.widget.Toast;
 
 import com.sam_chordas.android.stockhawk.R;
 import com.sam_chordas.android.stockhawk.data.QuoteProvider;
@@ -27,6 +30,7 @@ public class WidgetProvider extends AppWidgetProvider {
     private static HandlerThread mHandlerThread;
     private static Handler mHandler;
     private static QuoteDataProviderObserver mQuoteDataProviderObserver;
+    Context mContext=null;
 
     public WidgetProvider() {
         mHandlerThread = new HandlerThread("QuoteWidgetProvider-worker");
@@ -47,14 +51,18 @@ public class WidgetProvider extends AppWidgetProvider {
 
     @Override
     public void onReceive(Context ctx, Intent intent) {
+        mContext=ctx.getApplicationContext();
         final String action = intent.getAction();
         if (action.equals(CLICK_ACTION)) {
-            final String symbol = intent.getStringExtra("symbol");
-
-            Intent i = new Intent(ctx, GraphActivity.class);
-            i.setFlags (Intent.FLAG_ACTIVITY_NEW_TASK);
-            i.putExtra("Key", symbol);
-            ctx.startActivity(i);
+            if(isConnected()) {
+                final String symbol = intent.getStringExtra("symbol");
+                Intent i = new Intent(ctx, GraphActivity.class);
+                i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                i.putExtra("Key", symbol);
+                ctx.startActivity(i);
+            }else {
+                Toast.makeText(mContext,R.string.app_offline, Toast.LENGTH_SHORT).show();
+            }
         }
         super.onReceive(ctx, intent);
     }
@@ -86,6 +94,13 @@ public class WidgetProvider extends AppWidgetProvider {
             appWidgetManager.updateAppWidget(appWidgetIds[i], layout);
         }
         super.onUpdate(context, appWidgetManager, appWidgetIds);
+    }
+
+    private boolean isConnected() {
+        ConnectivityManager cm = (ConnectivityManager) mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo activeNetwork = cm.getActiveNetworkInfo();
+        return (activeNetwork != null &&
+                activeNetwork.isConnectedOrConnecting());
     }
 }
 
